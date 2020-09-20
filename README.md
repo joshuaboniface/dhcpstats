@@ -22,6 +22,19 @@ For failover configurations, multiple instances of DHCPStats can be run, each pr
 
 1. For production deployments, put the API behind a reverse proxy (e.g. NGiNX) with ACLs for maximum security.
 
+### Specific Details
+
+#### Debian
+
+* Use the SystemD or SysV initscript to start DHCPStats.
+* For SysV init, the `/etc/default/dhcpstats` file should be created in order to export the `DHCPSTATS_CONFIG_FILE`.
+* For SystemD, the service unit should be edited to set the location of the `DHCPSTATS_CONFIG_FILE`.
+
+#### FreeBSD
+
+* FreeBSD does not support `/usr/bin/env X` shebang constructs, so this must be replaced with the abolute path to your `python3` binary.
+* The configuration file is set in `/etc/rc.conf` with the `dhcpstats_config` argument. Like all FreeBSD daemons, `dhcpstats_enable` must be set to `YES` as well.
+
 ## Configuration File
 
 DHCPStats is configured with a basic YAML-formatted configuration file. The example contains some testing values as well as comments, but this section details them. All configuration is located under a single `dhcpstats:` root key.
