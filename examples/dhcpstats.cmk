@@ -1,0 +1,53 @@
+#!/usr/local/bin/python3
+
+import json
+import requests
+
+api_password = "test123"
+api_port = 1980
+
+api_headers = { 'X-Api-Key': api_password }
+
+def get_data(api_host):
+    api_url = "http://{}:{}/subnets".format(api_host, api_port)
+    response = requests.get(api_url, headers=api_headers)
+
+    if response.status_code == 200:
+        return json.loads(response.content.decode('utf-8'))
+    else:
+        return None
+
+dhcpstats = get_data('localhost')
+
+for subnet in dhcpstats:
+    try:
+        subnet_data = dhcpstats[subnet]
+    except:
+        continue
+
+    subnet_net = subnet
+    subnet_description = subnet_data.get('description', None)
+
+    subnet_total_ips = subnet_data['ips']['total']
+    subnet_used_ips = subnet_data['ips']['active']
+
+    # 0, 1, 2 = OK, WARN, CRIT
+    if subnet_total_ips > 0:
+        utilization_percent = int((subnet_used_ips / subnet_total_ips) * 100)
+    else:
+        utilization_percent = 0
+
+    if utilization_percent > 95:
+        level = 2
+        msg_head = 'CRIT'
+    elif utilization_percent > 90:
+        level = 1
+        msg_head = 'WARN'
+    else:
+        level = 0
+        msg_head = 'OK'
+
+    subnet_string = 'dhcpstats-{}'.format(subnet_net)
+    message = '{} - Subnet {} ({}) using {} of {} IPs ({}%)'.format(msg_head, subnet_net, subnet_description, subnet_used_ips, subnet_total_ips, utilization_percent)
+
+    print('{} {} util={};80;90 {}'.format(level, subnet_string, utilization_percent, message))
