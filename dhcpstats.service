@@ -1,0 +1,15 @@
+# DHCPStats daemon unit file
+
+[Unit]
+Description = DHCPStats API daemon
+After = network-online.target
+
+[Service]
+Type = simple
+Environment = PYTHONUNBUFFERED=true
+Environment = DHCPSTATS_CONFIG_FILE=/etc/dhcp/dhcpstats.yml
+ExecStart = /usr/local/bin/dhcpstats.py
+Restart = on-failure
+
+[Install]
+WantedBy = multi-user.target

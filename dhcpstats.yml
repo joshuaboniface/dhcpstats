@@ -1,0 +1,18 @@
+---
+# Example configuration file for dhcpstats
+dhcpstats:
+  # Enable or disable debug mode
+  debug: true
+  # API listen address; use 0.0.0.0 for all interfaces
+  listen: '0.0.0.0:1980'
+  # Authentication string to prevent unauthorized access
+  auth_string: test123
+  # Path to the file containing all subnet definitions (dhcpd.conf, or an included file)
+  #subnet_file: /etc/dhcp/dhcpd.conf
+  subnet_file: ./dhcpd.conf
+  # Path to the file containing all static IP definitions (dhcpd.conf, or an included file)
+  #static_file: /etc/dhcp/dhcpd.conf
+  static_file: ./dhcpd.conf
+  # Path to the DHCP leases database (dhcpd.leases)
+  #leases_file: /var/lib/dhcp/dhcpd.leases
+  leases_file: ./dhcpd.leases
