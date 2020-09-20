@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# $FreeBSD
+#
+# PROVIDE: dhcpstats
+# REQUIRE: SERVERS
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf
+# to enable this service:
+#
+# dhcpstats_enable (bool):   Set to NO by default.
+#                            Set it to YES to enable dhcpstats.
+# dhcpstats_config (path):   Set to the location of the "dhcpstats.yml" configuration file.
+#                            Defaults to "/etc/dhcp/dhcpstats.yml".
+
+. /etc/rc.subr
+
+name=dhcpstats
+rcvar="${name}_enable"
+command="/usr/local/bin/${name}.py"
+
+load_rc_config $name
+
+: ${dhcpstats_enable:="NO"}
+: ${dhcpstats_config:="/etc/dhcp/dhcpstats.yml"}
+
+command_args=""
+
+run_rc_command "$1"

@@ -16,7 +16,7 @@ For failover configurations, multiple instances of DHCPStats can be run, each pr
 
 1. Copy the configuration file `dhcpstats.yml` to somewhere useful, for instance in `/etc/dhcp/dhcpstats.yml`. Edit it to suit your needs - configuration detail are provided in the next section.
 
-1. Run the API using a service manager of your choice; a simple SystemD unit is provided. Make sure you export the `DHCPSTATS_CONFIG_FILE` environment variable containing the location of the configuration in the previous step.
+1. Run the API using a service manager of your choice; a simple SystemD unit, a SysV initscript, and a FreeBSD rc.d initscript are provided. Make sure you export the `DHCPSTATS_CONFIG_FILE` environment variable containing the location of the configuration in the previous step.
 
 1. Query the API endpoint at `http://<hostname>:<port>/subnets` to get the information, and use it as you wish.
 
