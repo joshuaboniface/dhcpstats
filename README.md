@@ -29,11 +29,13 @@ For failover configurations, multiple instances of DHCPStats can be run, each pr
 * Use the SystemD or SysV initscript to start DHCPStats.
 * For SysV init, the `/etc/default/dhcpstats` file should be created in order to export the `DHCPSTATS_CONFIG_FILE`.
 * For SystemD, the service unit should be edited to set the location of the `DHCPSTATS_CONFIG_FILE`.
+* DHCPStats has the following dependencies: `python3-yaml` `python3-gevent` `python3-flask` `python3-flask-restful`
 
-#### FreeBSD
+#### FreeBSD (12+)
 
-* FreeBSD does not support `/usr/bin/env X` shebang constructs, so this must be replaced with the abolute path to your `python3` binary.
+* FreeBSD does not support `/usr/bin/env X` shebang constructs, so this must be replaced with the abolute path to your `python3` binary in `dhcpstats.py`.
 * The configuration file is set in `/etc/rc.conf` with the `dhcpstats_config` argument. Like all FreeBSD daemons, `dhcpstats_enable` must be set to `YES` as well.
+* DHCPStats has the following dependencies: `py37-yaml` `py37-gevent` `py37-flask` `py37-flask-restful`
 
 ## Configuration File
 
