@@ -57,7 +57,7 @@ app = flask.Flask(__name__)
 if debug:
     app.config['DEBUG'] = True
 
-blueprint = flask.Blueprint('api', __name__, url_prefix='/api/v1')
+blueprint = flask.Blueprint('api', __name__, url_prefix='')
 
 api = Api(blueprint)
 app.register_blueprint(blueprint)
