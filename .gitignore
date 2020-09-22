@@ -7,4 +7,4 @@ dhcpd.leases*
 *.bak
 
 # Virtualenv
-venv
+venv*
