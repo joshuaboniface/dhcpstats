@@ -20,6 +20,7 @@
 ###############################################################################
 
 import os
+import sys
 import yaml
 import re
 import ipaddress
@@ -28,16 +29,38 @@ import gevent.pywsgi
 from gevent import monkey
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
+from time import time
+
+debug = True
+
+def logger(msg, end='\n', t_start=None):
+    # We only log in debug mode
+    if not debug:
+        return 0
+
+    # Starting a timed message
+    if not t_start:
+        t_start = int(time())
+    # Completing a timed message
+    else:
+        t_tot = int(time()) - t_start
+        msg = msg + " [{}s]".format(str(t_tot))
+    # Output the message
+    print(msg, end=end, file=sys.stderr)
+    sys.stderr.flush()
+
+    # Return t_start
+    return t_start
 
 config_file = os.environ.get('DHCPSTATS_CONFIG_FILE')
 if config_file is None:
-    print('Error: The "DHCPSTATS_CONFIG_FILE" environment variable must be set before starting dhcpstats.')
+    logger('Error: The "DHCPSTATS_CONFIG_FILE" environment variable must be set before starting dhcpstats.')
     exit(1)
 try:
     with open(config_file, 'r') as cfgfile:
         o_config = yaml.load(cfgfile, Loader=yaml.BaseLoader)
 except Exception as e:
-    print('Error: Failed to parse configuration file: {}'.format(e))
+    logger('Error: Failed to parse configuration file: {}'.format(e))
     exit(1)
 try:
     debug = o_config['dhcpstats'].get('debug', False)
@@ -48,7 +71,7 @@ try:
     static_file = o_config['dhcpstats']['static_file']
     leases_file = o_config['dhcpstats']['leases_file']
 except KeyError as e:
-    print('Error: Failed to parse required configuration key: {}'.format(e))
+    logger('Error: Failed to parse required configuration key: {}'.format(e))
     exit(1)
 
 # Set up the flask app
@@ -71,13 +94,12 @@ def get_subnets(subnet_file, static_file, leases_file):
     used and total number of IPs in the range.
     """
     # Read in the subnet_file
-    if debug:
-        print('Opening subnet file...')
+    t_start = logger('Reading subnet file... ', end='')
     with open(subnet_file, 'r') as subnets_fh:
         subnets_raw = subnets_fh.read().split('\n')
+    logger('done.', t_start=t_start)
 
-    if debug:
-        print('Parsing subnets...')
+    t_start = logger('Parsing subnets... ', end='')
     subnets = dict()
     in_subnet_block = False
     in_pool_block = False
@@ -95,6 +117,7 @@ def get_subnets(subnet_file, static_file, leases_file):
             if current_subnet:
                 subnets[current_subnet.with_prefixlen]['statics'] = dict()
                 subnets[current_subnet.with_prefixlen]['leases'] = dict()
+            continue
         # Inside a subnet block
         if in_subnet_block:
             # End of a pool block
@@ -136,6 +159,8 @@ def get_subnets(subnet_file, static_file, leases_file):
             elif re.match('^\s*ddns-domainname', line):
                 subnets[current_subnet.with_prefixlen]['ddns_domain_name'] = re.sub('"', '', line_split[-1])
 
+            continue
+
         # Start of a subnet block
         if re.match('^subnet', line):
             in_subnet_block = True
@@ -150,15 +175,79 @@ def get_subnets(subnet_file, static_file, leases_file):
             subnets[subnet.with_prefixlen]['ips']['backup'] = 0
             subnets[subnet.with_prefixlen]['ips']['unused'] = 0
             subnets[subnet.with_prefixlen]['ips']['static'] = 0
+    logger('done. ({} subnets parsed)'.format(len(subnets)), t_start=t_start)
+
+    # Read in the static entries
+    t_start = logger('Reading static file... ', end='')
+    with open(static_file, 'r') as static_fh:
+        statics_raw = static_fh.read().split('\n')
+    logger('done.', t_start=t_start)
+
+    t_start = logger('Parsing statics... ', end='')
+    statics = dict()
+    in_host_block = False
+    current_static = ''
+
+    # Iterate through the lines
+    for line in statics_raw:
+        # Split the line for easier parsing later
+        line_split = line.split()
+        # End of a host block
+        if re.match('^}', line):
+            in_host_block = False
+            continue
+        # Inside a host block (multiline)
+        if in_host_block:
+            if re.match('^\s*hardware ethernet', line):
+                statics[current_static]['mac_address'] = re.sub(';', '', line_split[-1])
+            elif re.match('^\s*fixed-address', line):
+                statics[current_static]['ip_address'] = re.sub(';', '', line_split[-1])
+            elif re.match('^\s*option host-name', line):
+                statics[current_static]['host_name'] = re.sub('[";]', '', line_split[-1])
+            continue
+        # Start of a host block
+        if re.match('^host', line):
+            name = line_split[1]
+            current_static = name
+            # This is a single-line host entry, just do the rest of our parsing here
+            if re.match('.*}$', line):
+                in_host_section = False
+                hardware_ethernet_idx = 0
+                static_address_idx = 0
+                host_name_idx = 0
+                for idx, element in enumerate(line_split):
+                    if re.match('}', element):
+                        in_host_section = False
+                        continue
+                    if in_host_section:
+                        if element == 'ethernet':
+                            hardware_ethernet_idx = idx + 1
+                        elif element == 'fixed-address':
+                            static_address_idx = idx + 1
+                        elif element == 'host-name':
+                            host_name_idx = idx + 1
+                        continue
+                    if re.match('{', element):
+                        in_host_section = True
+                statics[name] = {}
+                if hardware_ethernet_idx > 0:
+                    statics[name]['mac_address'] = re.sub(';', '', line_split[hardware_ethernet_idx])
+                if static_address_idx > 0:
+                    statics[name]['ip_address'] = re.sub(';', '', line_split[static_address_idx])
+                if host_name_idx > 0:
+                    statics[name]['host_name'] = re.sub(';', '', line_split[host_name_idx])
+            else:
+                in_host_block = True
+                statics[name] = {}
+    logger('done. ({} statics parsed)'.format(len(statics)), t_start=t_start)
 
     # Read in the leases_file
-    if debug:
-        print('Opening leases file...')
+    t_start = logger('Reading leases file... ', end='')
     with open(leases_file, 'r') as leases_fh:
         leases_raw = leases_fh.read().split('\n')
+    logger('done.', t_start=t_start)
 
-    if debug:
-        print('Parsing leases...')
+    t_start = logger('Parsing leases... ', end='')
     leases = dict()
     in_lease_block = False
     current_lease = ''
@@ -178,114 +267,40 @@ def get_subnets(subnet_file, static_file, leases_file):
 
     # Iterate through the lines
     for line in leases_raw:
-        # Strip off any trailing semicolons
-        line = re.sub(';$', '', line)
         # Split the line for easier parsing later
         line_split = line.split()
         # End of a lease block
         if re.match('^}', line):
             in_lease_block = False
+            continue
         # Inside a lease block
         if in_lease_block:
             # Determine the type and thus data len
             field = line_split[0]
             if lease_schema.get(field):
                 field_name = '-'.join(line_split[lease_schema[field]['name_start']:lease_schema[field]['name_end']])
-                field_data = re.sub('"', '', ' '.join(line_split[lease_schema[field]['data_start']:]))
-            else:
-                continue
-            leases[str(current_lease)][field_name] = field_data
+                field_data = re.sub('[";]', '', ' '.join(line_split[lease_schema[field]['data_start']:]))
+                leases[str(current_lease)][field_name] = field_data
+            continue
         # Start of a lease block
         if re.match('^lease', line):
             in_lease_block = True
             lease = ipaddress.ip_address(line_split[1])
             current_lease = lease
             leases[str(lease)] = dict()
-
-    # Read in the static entries
-    if debug:
-        print('Opening static file...')
-    with open(static_file, 'r') as static_fh:
-        statics_raw = static_fh.read().split('\n')
-
-    if debug:
-        print('Parsing statics...')
-    statics = dict()
-    in_host_block = False
-    current_static = ''
-
-    # Iterate through the lines
-    for line in statics_raw:
-        # Strip off any trailing semicolons
-        line = re.sub(';$', '', line)
-        # Split the line for easier parsing later
-        line_split = line.split()
-        # End of a host block
-        if re.match('$}', line):
-            in_host_block = False
-        # Inside a host block (multiline)
-        if in_host_block:
-            if re.match('^\s*hardware ethernet', line):
-                statics[current_static]['mac_address'] = line_split[-1]
-            elif re.match('^\s*fixed-address', line):
-                statics[current_static]['ip_address'] = line_split[-1]
-            elif re.match('^\s*option host-name', line):
-                statics[current_static]['host_name'] = re.sub('"', '', line_split[-1])
-        # Start of a host block
-        if re.match('^host', line):
-            in_host_block = True
-            name = line_split[1]
-            current_static = name
-            # This is a single-line host entry, just do the rest of our parsing here
-            if re.match('.*}$', line):
-                in_host_section = False
-                hardware_ethernet_idx = 0
-                static_address_idx = 0
-                host_name_idx = 0
-                for idx, element in enumerate(line_split):
-                    if re.match('}', element):
-                        in_host_section = False
-                    if in_host_section:
-                        if re.match('ethernet', element):
-                            hardware_ethernet_idx = idx + 1
-                        elif re.match('fixed-address', element):
-                            static_address_idx = idx + 1
-                        elif re.match('host-name', element):
-                            host_name_idx = idx + 1
-                    if re.match('{', element):
-                        in_host_section = True
-                statics[name] = {}
-                if hardware_ethernet_idx > 0:
-                    statics[name]['mac_address'] = re.sub(';', '', line_split[hardware_ethernet_idx])
-                if static_address_idx > 0:
-                    statics[name]['ip_address'] = re.sub(';', '', line_split[static_address_idx])
-                if host_name_idx > 0:
-                    statics[name]['host_name'] = re.sub(';', '', line_split[host_name_idx])
-            else:
-                statics[name] = {}
+    logger('done. ({} leases parsed)'.format(len(leases)), t_start=t_start)
 
     # We now have a full dictionary of subnets and of leases; combine them into a final data structure
-    if debug:
-        print('Combining and counting leases...')
-    for lease in leases:
-        lease_ipobj = ipaddress.ip_address(lease)
-        for subnet in subnets:
-            subnet_ipobj = ipaddress.ip_network(subnet)
-            if lease_ipobj in subnet_ipobj:
-                lease_subnet = subnet
-        binding_state = leases[lease]['binding-state']
-        if lease_subnet:
-            if binding_state == 'active':
-                subnets[lease_subnet]['ips']['active'] += 1
-            elif binding_state == 'free':
-                subnets[lease_subnet]['ips']['free'] += 1
-            elif binding_state == 'backup':
-                subnets[lease_subnet]['ips']['backup'] += 1
-            subnets[lease_subnet]['leases'][lease] = leases[lease]
+    t_start = logger('Combining and counting subnets... ', end='')
+    for subnet in subnets:
+        subnet_used = subnets[subnet]['ips']['active'] + subnets[subnet]['ips']['free'] + subnets[subnet]['ips']['backup']
+        subnet_unused = subnets[subnet]['ips']['total'] - subnet_used
+        subnets[subnet]['ips']['unused'] = subnet_unused
+    logger('done.', t_start=t_start)
 
-    if debug:
-        print('Combining and counting statics...')
+    t_start = logger('Combining and counting statics... ', end='')
     for static in statics:
+        static_subnet = None
         static_ipobj = ipaddress.ip_address(statics[static]['ip_address'])
         for subnet in subnets:
             subnet_ipobj = ipaddress.ip_network(subnet)
@@ -294,16 +309,31 @@ def get_subnets(subnet_file, static_file, leases_file):
         if static_subnet:
             subnets[static_subnet]['statics'][static] = statics[static]
             subnets[static_subnet]['ips']['static'] += 1
+    logger('done.', t_start=t_start)
 
-    if debug:
-        print('Combining and counting subnets...')
-    for subnet in subnets:
-        subnet_used = subnets[subnet]['ips']['active'] + subnets[subnet]['ips']['free'] + subnets[subnet]['ips']['backup']
-        subnet_unused = subnets[subnet]['ips']['total'] - subnet_used
-        subnets[subnet]['ips']['unused'] = subnet_unused
+    t_start = logger('Combining and counting leases... ', end='')
+    subnets_ipobj = list()
+    for subnet in subnets.keys():
+        subnets_ipobj.append(ipaddress.ip_network(subnet))
+    for lease in leases:
+        lease_subnet = None
+        lease_ipobj = ipaddress.ip_address(lease)
+        for subnet_ipobj in subnets_ipobj:
+            if lease_ipobj in subnet_ipobj:
+                lease_subnet = subnet_ipobj.with_prefixlen
+                break
+        if lease_subnet:
+            lease_data = leases[lease]
+            binding_state = lease_data['binding-state']
+            if binding_state == 'active':
+                subnets[lease_subnet]['ips']['active'] += 1
+            elif binding_state == 'free':
+                subnets[lease_subnet]['ips']['free'] += 1
+            elif binding_state == 'backup':
+                subnets[lease_subnet]['ips']['backup'] += 1
+            subnets[lease_subnet]['leases'][lease] = lease_data
+    logger('done.', t_start=t_start)
 
-    if debug:
-        print('Returning...')
     retdata = subnets
     retcode = 200
     return retdata, retcode
