@@ -1,7 +1,10 @@
 # These are used for testing dhcpstats
-dhcpd.conf
-dhcpd.leases
+dhcpd.conf*
+dhcpd.leases*
 
 # Standard exclusions
 *.swp
 *.bak
+
+# Virtualenv
+venv
