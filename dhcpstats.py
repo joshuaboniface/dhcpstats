@@ -50,7 +50,7 @@ def logger(msg, end='\n', t_start=None):
     # Log the message
     if log_to_file and log_file:
         with open(log_file, 'a') as log_fh:
-            log_fh.write('{} {}'.format(datetime(), msg))
+            log_fh.write('{} {}\n'.format(datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f'), msg))
     sys.stderr.flush()
 
     # Return t_start
@@ -87,6 +87,10 @@ if not debug:
     except:
         # Force running in Flask debug mode since there is no valid gevent
         debug = True
+
+if log_to_file and log_file is not None:
+    import logging
+    logging.basicConfig(filename=log_file,level=logging.DEBUG)
 
 # Set up the flask app
 app = flask.Flask(__name__)
