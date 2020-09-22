@@ -45,6 +45,14 @@ DHCPStats is configured with a basic YAML-formatted configuration file. The exam
 
 The `debug` option can be either `true` or `false`. When `true`, it enables the debug Flask web server and debug mode within Flask. When `false`, the Flask app runs under the GEvent PyWSGI web server. If this option is absent, it is assumed as `false`.
 
+#### `log_to_file`
+
+The `log_to_file` option can be either `true` or `false`. When `true`, log output of the daemon to the file specified in `log_file`. If this option is absent, it is assumed as `false`.
+
+#### `log_file`
+
+The `log_file` option sets the path to a log file when `log_to_file` is `true`. If this option is absent, file logging is disabled implicitly.
+
 #### `listen`
 
 The `listen` option contains an `<ipaddress>:<port>` string which tells the Flask server where to listen. You can choose any IP on the host and any port; use `0.0.0.0` for the IP to listen on all interfaces.

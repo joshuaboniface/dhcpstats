@@ -28,12 +28,13 @@ import flask
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
+from datetime import datetime
 
 debug = True
 
 def logger(msg, end='\n', t_start=None):
     # We only log in debug mode
-    if not debug:
+    if not debug or not log_to_file:
         return 0
 
     # Starting a timed message
@@ -44,7 +45,12 @@ def logger(msg, end='\n', t_start=None):
         t_tot = int(time()) - t_start
         msg = msg + " [{}s]".format(str(t_tot))
     # Output the message
-    print(msg, end=end, file=sys.stderr)
+    if debug:
+        print(msg, end=end, file=sys.stderr)
+    # Log the message
+    if log_to_file and log_file:
+        with open(log_file, 'a') as log_fh:
+            log_fh.write('{} {}'.format(datetime(), msg))
     sys.stderr.flush()
 
     # Return t_start
@@ -62,6 +68,8 @@ except Exception as e:
     exit(1)
 try:
     debug = o_config['dhcpstats'].get('debug', False)
+    log_to_file = o_config['dhcpstats'].get('log_to_file', False)
+    log_file = o_config['dhcpstats'].get('log_file', None)
     auth_string = o_config['dhcpstats'].get('auth_string', None)
     listen_addr = o_config['dhcpstats']['listen'].split(':')[0]
     listen_port = o_config['dhcpstats']['listen'].split(':')[-1]
