@@ -25,8 +25,6 @@ import yaml
 import re
 import ipaddress
 import flask
-import gevent.pywsgi
-from gevent import monkey
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
@@ -73,6 +71,14 @@ try:
 except KeyError as e:
     logger('Error: Failed to parse required configuration key: {}'.format(e))
     exit(1)
+
+if not debug:
+    try:
+        import gevent.pywsgi
+        from gevent import monkey
+    except:
+        # Force running in Flask debug mode since there is no valid gevent
+        debug = True
 
 # Set up the flask app
 app = flask.Flask(__name__)
