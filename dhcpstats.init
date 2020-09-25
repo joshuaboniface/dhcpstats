@@ -16,8 +16,6 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/local/bin/dhcpstats.py
 PIDFILE=/run/dhcpstats.pid
 
-test -x $DAEMON || exit 0
-
 if [ -r /etc/default/dhcpstats ]; then
         . /etc/default/dhcpstats
 fi
@@ -25,17 +23,17 @@ fi
 case $1 in
         start)
                 log_daemon_msg "Starting DHCPStats daemon" "dhcpstats"
-                start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --startas $DAEMON
+                start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE --exec $DAEMON
                 log_end_msg $?
                 ;;
         stop)
                 log_daemon_msg "Stopping DHCPStats daemon" "dhcpstats"
-                start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE --retry=TERM/30/KILL/5 --exec $DAEMON
+                start-stop-daemon --stop --pidfile $PIDFILE --retry=TERM/30/KILL/5 --exec $DAEMON
                 log_end_msg $?
                 rm -f $PIDFILE
                 ;;
         restart|force-reload)
-                $0 stop && sleep 2 && $0 start
+                $0 stop && sleep 1 && $0 start
                 ;;
         status)
                 status_of_proc $DAEMON "DHCPStats daemon"
