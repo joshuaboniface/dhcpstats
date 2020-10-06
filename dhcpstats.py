@@ -58,13 +58,13 @@ def logger(msg, end='\n', t_start=None):
 
 config_file = os.environ.get('DHCPSTATS_CONFIG_FILE')
 if config_file is None:
-    logger('Error: The "DHCPSTATS_CONFIG_FILE" environment variable must be set before starting dhcpstats.')
+    print('Error: The "DHCPSTATS_CONFIG_FILE" environment variable must be set before starting dhcpstats.')
     exit(1)
 try:
     with open(config_file, 'r') as cfgfile:
         o_config = yaml.load(cfgfile, Loader=yaml.BaseLoader)
 except Exception as e:
-    logger('Error: Failed to parse configuration file: {}'.format(e))
+    print('Error: Failed to parse configuration file: {}'.format(e))
     exit(1)
 try:
     debug = o_config['dhcpstats'].get('debug', False)
@@ -77,7 +77,7 @@ try:
     static_file = o_config['dhcpstats']['static_file']
     leases_file = o_config['dhcpstats']['leases_file']
 except KeyError as e:
-    logger('Error: Failed to parse required configuration key: {}'.format(e))
+    print('Error: Failed to parse required configuration key: {}'.format(e))
     exit(1)
 
 if not debug:
