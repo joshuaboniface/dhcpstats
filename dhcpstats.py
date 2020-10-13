@@ -79,7 +79,7 @@ try:
     refresh_time = int(o_config['dhcpstats']['refresh_time'])
     auth_string = o_config['dhcpstats'].get('auth_string', None)
     listen_addr = o_config['dhcpstats']['listen'].split(':')[0]
-    listen_port = o_config['dhcpstats']['listen'].split(':')[-1]
+    listen_port = int(o_config['dhcpstats']['listen'].split(':')[-1])
     subnet_file = o_config['dhcpstats']['subnet_file']
     static_file = o_config['dhcpstats']['static_file']
     leases_file = o_config['dhcpstats']['leases_file']
