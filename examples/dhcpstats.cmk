@@ -9,7 +9,7 @@ api_port = 1980
 api_headers = { 'X-Api-Key': api_password }
 
 def get_data(api_host):
-    api_url = "http://{}:{}/subnets".format(api_host, api_port)
+    api_url = "http://{}:{}/subnets/list".format(api_host, api_port)
     response = requests.get(api_url, headers=api_headers)
 
     if response.status_code == 200:
