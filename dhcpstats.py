@@ -583,7 +583,7 @@ if __name__ == "__main__":
     if auto_refresh:
         refresh_timer = BackgroundScheduler()
         logger('Starting autorefresh timer ({} second interval)'.format(refresh_time))
-        refresh_timer.add_job(save_data, 'interval', seconds=refresh_time)
+        refresh_timer.add_job(save_data, 'interval', seconds=refresh_time, misfire_grace_time=int(refresh_time/2))
         refresh_timer.start()
 
     # Set up clean termination
