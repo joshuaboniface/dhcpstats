@@ -235,7 +235,7 @@ The `active` value counts how many valid leases from the `dhcpd.leases` database
 
 The `free` value counts how many leases from the `dhcpd.leases` database are in a `free` `binding-state`. Once an `active` lease expires, the lease becomes `free` and is still stored in the database, where it can be claimed by another client in the future.
 
-The `backup` value is only relevant for failover configurations. It counts the number of leases which are in a `backup` `binding-state`. These leases are known to the current DHCP server, but are in `backup` state and thus may be in another state (`active`, `free`) on the failover peer.
+The `backup` value is only relevant for failover configurations. It counts the number of leases which are in a `backup` `binding-state`. These leases are reserved for DHCP failover and are thus not used by clients unless the server goes into a failover state.
 
 The `unused` value is calculated by adding all the `active`, `free`, and `backup` counts together, then subtracting this from the `total` value. This value represents all the potentially valid leases the server could hand out from the configured `ranges`, but which have not been registered in the `dhcpd.leases` database yet due to not having ever been requested. After a long time of serving clients, it's unlikely that a subnet will have any `unused` IPs, but newer or low-volume subnets might have quite a lot of `unused` IPs.
 
