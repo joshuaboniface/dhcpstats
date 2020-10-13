@@ -87,13 +87,7 @@ The `leases_file` option sets a path to the ISC-DHCP live leases database. This 
 
 ## API Usage
 
-The API provides two endpoints:
-
-* `/` provides a quick test for activity and returns a basic message signalling that this is a DHCPStats API.
-
-* `/subnets` provides all other functions and takes no options. When queried and authenticated (if applicable), the output shown in the next section will be returned. This output is JSON with a number of child dictionaries, one per subnet.
-
-## API Endpoints
+The API provides five endpoints:
 
 #### `/`
 
