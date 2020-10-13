@@ -16,7 +16,7 @@ DHCPStats seeks to make life a little easier. It provides a convenient HTTP API 
 
 1. Run the API using a service manager of your choice; a simple SystemD unit, a SysV initscript, and a FreeBSD rc.d initscript are provided. Make sure you export the `DHCPSTATS_CONFIG_FILE` environment variable containing the location of the configuration in the previous step.
 
-1. Query the API endpoint at `http://<hostname>:<port>/subnets` to get the information, and use it as you wish.
+1. Query the API endpoints to get the information, and use it as you wish.
 
 1. For production deployments, put the API behind a reverse proxy (e.g. NGiNX) with ACLs for maximum security.
 
