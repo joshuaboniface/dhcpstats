@@ -6,8 +6,6 @@ While there are several ways to get this information, for instance `dhcp-lease-l
 
 DHCPStats seeks to make life a little easier. It provides a convenient HTTP API returning JSON representations of the subnets in your configuration, with all the important subnet details, as well as lists both of all static reservations defined in the configuration for the subnet, as well as all active leases for the subnet. This provides a great deal of flexibility to the consumer, allowing them to decide how to use the structured data to build monitoring or observation tools to provide insight into their DHCP server.
 
-For failover configurations, multiple instances of DHCPStats can be run, each providing the information for a single server. Since the resulting data is JSON formatted, this allows easy combining of the differing `ips` and `leases` entries to provide a unified view into the failover peers.
-
 ## Usage
 
 1. Install the required Python 3 dependencies: `yaml`, `apscheduler`, `flask`, `flask_restful`, `gevent`, and `functools`.
