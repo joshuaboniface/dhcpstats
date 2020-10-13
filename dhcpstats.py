@@ -21,14 +21,17 @@
 
 import os
 import sys
+import signal
 import yaml
 import re
+import json
 import ipaddress
 import flask
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
 from datetime import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
 
 debug = True
 
@@ -40,6 +43,7 @@ def logger(msg, end='\n', t_start=None):
     # Starting a timed message
     if not t_start:
         t_start = int(time())
+        msg = '{} {}'.format(datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f'), msg)
     # Completing a timed message
     else:
         t_tot = int(time()) - t_start
@@ -70,6 +74,9 @@ try:
     debug = o_config['dhcpstats'].get('debug', False)
     log_to_file = o_config['dhcpstats'].get('log_to_file', False)
     log_file = o_config['dhcpstats'].get('log_file', None)
+    data_directory = o_config['dhcpstats']['data_directory']
+    auto_refresh = o_config['dhcpstats'].get('auto_refresh', False)
+    refresh_time = int(o_config['dhcpstats']['refresh_time'])
     auth_string = o_config['dhcpstats'].get('auth_string', None)
     listen_addr = o_config['dhcpstats']['listen'].split(':')[0]
     listen_port = o_config['dhcpstats']['listen'].split(':')[-1]
@@ -78,6 +85,23 @@ try:
     leases_file = o_config['dhcpstats']['leases_file']
 except KeyError as e:
     print('Error: Failed to parse required configuration key: {}'.format(e))
+    exit(1)
+
+# Confirm the data directory exists or create it, dying if unable to
+data_file = '{}/dhcpstats.subnets'.format(data_directory)
+if not os.path.isdir(data_directory):
+    try:
+        os.makedirs(data_directory, 0o700)
+    except:
+        print('Error: Cannot create data directory {}'.format(data_directory))
+        exit(1)
+
+# Attempt to create/write to the file
+try:
+    with open(data_file, 'a') as fh:
+        fh.write('')
+except:
+    print('Error: Cannot write to data file {}'.format(data_file))
     exit(1)
 
 if not debug:
@@ -106,7 +130,7 @@ app.register_blueprint(blueprint)
 #
 # Helper functions
 #
-def get_subnets(subnet_file, static_file, leases_file):
+def parse_data():
     """
     Parse the subnets file and leases file to obtain a list of subnets as well as the
     used and total number of IPs in the range.
@@ -352,9 +376,24 @@ def get_subnets(subnet_file, static_file, leases_file):
             subnets[lease_subnet]['leases'][lease] = lease_data
     logger('done.', t_start=t_start)
 
-    retdata = subnets
-    retcode = 200
-    return retdata, retcode
+    return subnets
+
+def save_data():
+    try:
+        subnets = parse_data()
+        with open(data_file, 'w') as fh:
+            fh.write(json.dumps(subnets))
+        return True, ''
+    except Exception as e:
+        return False, str(e)
+
+def load_data():
+    try:
+        with open(data_file, 'r') as fh:
+            subnets = json.loads(fh.read())
+        return True, subnets
+    except Exception as e:
+        return False, str(e)
 
 #
 # API helper definitons
@@ -373,7 +412,6 @@ def Authenticator(function):
 #
 # API routes
 #
-
 class API_Root(Resource):
     @Authenticator
     def get(self):
@@ -394,16 +432,71 @@ class API_Root(Resource):
                   description: A text message
                   example: "dhcpstats API"
         """
-        return { "message": "dhcpstats API" }
+        return { "message": "dhcpstats API" }, 200
 api.add_resource(API_Root, '/')
 
 class API_Subnets(Resource):
     @Authenticator
     def get(self):
         """
-        Return a list of active subnets
+        Return basic details of the API
         ---
-        rags:
+        tags:
+          - root
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              id: API-Root
+              properties:
+                message:
+                  type: string
+                  description: A text message
+                  example: "dhcpstats API"
+        """
+        return { "message": "dhcpstats API" }, 200
+api.add_resource(API_Subnets, '/subnets')
+
+class API_Refresh(Resource):
+    @Authenticator
+    def post(self):
+        """
+        (Manually) refresh the cached data file
+        ---
+        tags:
+          - root
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              id: API-Result
+              properties:
+                result:
+                  type: string
+                  description: A result description
+                  example: "ok"
+          t00:
+            description: ERROR
+            schema:
+              type: object
+              id: API-Result
+        """
+        result, data = save_data()
+        if result:
+            return { "result": "ok" }, 200
+        else:
+            return { "result": data }, 500
+api.add_resource(API_Refresh, '/refresh')
+
+class API_Subnets_All(Resource):
+    @Authenticator
+    def get(self):
+        """
+        Return a list of active subnets with all lease data
+        ---
+        tags:
           - subnets
         responses:
           200:
@@ -413,19 +506,99 @@ class API_Subnets(Resource):
               id: subnet
               properties:
         """
-        return get_subnets(subnet_file, static_file, leases_file)
-api.add_resource(API_Subnets, '/subnets')
+        result, data = load_data()
+        if result:
+            return data, 200
+        else:
+            return { "result": data }, 500
+api.add_resource(API_Subnets_All, '/subnets/all')
+
+class API_Subnets_List(Resource):
+    @Authenticator
+    def get(self):
+        """
+        Return list of active subnets
+        ---
+        tags:
+          - subnets
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              id: subnet
+              properties:
+        """
+        result, data = load_data()
+        if result:
+            for subnet in data:
+                del data[subnet]['leases']
+                del data[subnet]['statics']
+            return data, 200
+        else:
+            return { "result": data }, 500
+api.add_resource(API_Subnets_List, '/subnets/list')
+
+class API_Subnets_Detail(Resource):
+    @Authenticator
+    def get(self, subnet_ip):
+        """
+        Return full details, including leases and statics, of a given subnet
+        ---
+        tags:
+          - subnets
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              id: subnet
+              properties:
+        """
+        result, data = load_data()
+        requested_subnet = '255.255.255.255'
+        for subnet in data.keys():
+            if subnet.split('/')[0] == subnet_ip:
+                requested_subnet = subnet
+                break
+        subnet_data = data.get(requested_subnet, None)
+        if subnet_data is not None:
+            return subnet_data, 200
+        else:
+            return { "result": "subnet {} was not found".format(subnet_ip) }, 404
+api.add_resource(API_Subnets_Detail, '/subnets/<subnet_ip>')
 
 #
 # Entrypoint
 #
 
-if debug:
-    app.run(listen_addr, listen_port)
-else:
-    monkey.patch_all()
-    http_server = gevent.pywsgi.WSGIServer(
-        (listen_addr, listen_port),
-        app
-    )
-    http_server.serve_forever()
+if __name__ == "__main__":
+    # Run the initial parse of the data
+    logger('Running initial data parse and save')
+    save_data()
+
+    # Set up the recurring refresh job
+    if auto_refresh:
+        refresh_timer = BackgroundScheduler()
+        logger('Starting autorefresh timer ({} second interval)'.format(refresh_time))
+        refresh_timer.add_job(save_data, 'interval', seconds=refresh_time)
+        refresh_timer.start()
+
+    # Set up clean termination
+    def cleanup():
+        refresh_timer.shutdown()
+    signal.signal(signal.SIGTERM, cleanup)
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGQUIT, cleanup)
+
+    if debug:
+        logger('Starting API in debug mode')
+        app.run(listen_addr, listen_port, use_reloader=False)
+    else:
+        logger('Starting API in production mode')
+        monkey.patch_all()
+        http_server = gevent.pywsgi.WSGIServer(
+            (listen_addr, listen_port),
+            app
+        )
+        http_server.serve_forever()

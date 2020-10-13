@@ -7,6 +7,14 @@ dhcpstats:
   log_to_file: true
   # Log file path
   log_file: ./dhcpstats.log
+  # Data directory; to reduce response times, data is regularly parsed and stored in this directory
+  data_directory: /var/lib/dhcpstats
+  # Whether to automatically refresh the data store or not
+  # If auto_refresh is disabled, the `/refresh` endpoint must be hit periodically to ensure that
+  # consumers obtain fresh/any data.
+  auto_refresh: true
+  # How often (in seconds) to automatically refresh the data store to provide fresh data to clients
+  refresh_time: 60
   # API listen address; use 0.0.0.0 for all interfaces
   listen: '0.0.0.0:1980'
   # Authentication string to prevent unauthorized access
