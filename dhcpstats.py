@@ -37,7 +37,7 @@ debug = True
 
 def logger(msg, end='\n', t_start=None):
     # We only log in debug mode
-    if not debug or not log_to_file:
+    if not debug and not log_to_file:
         return 0
 
     # Starting a timed message
@@ -573,6 +573,8 @@ api.add_resource(API_Subnets_Detail, '/subnets/<subnet_ip>')
 #
 
 if __name__ == "__main__":
+    logger('Starting up')
+
     # Run the initial parse of the data
     logger('Running initial data parse and save')
     save_data()
