@@ -10,7 +10,7 @@ For failover configurations, multiple instances of DHCPStats can be run, each pr
 
 ## Usage
 
-1. Install the required Python 3 dependencies: `yaml`, `flask`, `flask_restful`, `gevent`, and `functools`.
+1. Install the required Python 3 dependencies: `yaml`, `apscheduler`, `flask`, `flask_restful`, `gevent`, and `functools`.
 
 1. Install the `dhcpstats.py` binary somewhere useful, for instance in `/usr/local/bin`.
 
@@ -53,6 +53,18 @@ The `log_to_file` option can be either `true` or `false`. When `true`, log outpu
 
 The `log_file` option sets the path to a log file when `log_to_file` is `true`. If this option is absent, file logging is disabled implicitly.
 
+#### `data_directory`
+
+The `data_directory` option sets the directory path for dhcpstats to store its parsed information in JSON format. This enables quicker responses by only parsing the data sparingly, and then storing it in this directory for future use.
+
+#### `auto_refresh`
+
+The `auto_refresh` option can be wither `true` or `false`. When `true`, the API will occasionally refresh the parsed data stored under `data_directory` automatically. When `false`, a specific API endpoint must be hit to refresh the data. In either case, the data is refreshed once on first startup.
+
+#### `refresh_time`
+
+The `refres_time` option specifies a number of seconds between `auto_refresh` events. This number should be high enough to avoid overloading the system (dependent on parsing time) while low enough to not return excessively-outdated data. Between 30 and 300 seconds generally sufficient.
+
 #### `listen`
 
 The `listen` option contains an `<ipaddress>:<port>` string which tells the Flask server where to listen. You can choose any IP on the host and any port; use `0.0.0.0` for the IP to listen on all interfaces.
@@ -80,6 +92,32 @@ The API provides two endpoints:
 * `/` provides a quick test for activity and returns a basic message signalling that this is a DHCPStats API.
 
 * `/subnets` provides all other functions and takes no options. When queried and authenticated (if applicable), the output shown in the next section will be returned. This output is JSON with a number of child dictionaries, one per subnet.
+
+## API Endpoints
+
+#### `/`
+
+The root endpoint returns status information about the API.
+
+#### `/subnets`
+
+The `/subnets` endpoint returns status information about the API.
+
+#### `/subnets/list`
+
+The `/subnets/list` endpoint returns a list of found subnets and their details. The subsections `statics` and `leases` are not present in this output to minimize its size.
+
+#### `/subnets/all`
+
+The `/subnets/all` endpoint returns a list of found subnets and their details, identical to the `/subnets/list` endpoint, but including all `statics` and `leases` information for each subnet.
+
+WARNING: This output can be very large on larger ISC-DHCP instances.
+
+#### `/subnets/<subnet_ip>`
+
+The `/subnets/<subnet_ip>` endpoint returns the subnet details for the `<subnet_ip>` subnet.
+
+Due to the limitations of HTTP, the subnet mask component of a full subnet address (e.g. `10.0.0.0/24`) cannot be sent. Thus, this endpoint expects **only** the network address component of the subnet (e.g. `10.0.0.0`) without the mask component. In normal networking situations this would be ambiguous, but since the API already contains a full list of the valid subnets, at most one subnet will exactly match this network address in a properly-configured ISC-DHCP server, and that subnet only will be returned. Sending a mask will result in a 404 error; when for instance taking output from the `/subnets/list` output, care should be taken to strip off the subnet mask portion before sending the reuest for full details.
 
 ## Example Output
 
