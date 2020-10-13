@@ -66,7 +66,7 @@ if config_file is None:
     exit(1)
 try:
     with open(config_file, 'r') as cfgfile:
-        o_config = yaml.load(cfgfile, Loader=yaml.BaseLoader)
+        o_config = yaml.load(cfgfile, Loader=yaml.SafeLoader)
 except Exception as e:
     print('Error: Failed to parse configuration file: {}'.format(e))
     exit(1)
