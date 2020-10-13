@@ -59,11 +59,11 @@ The `data_directory` option sets the directory path for dhcpstats to store its p
 
 #### `auto_refresh`
 
-The `auto_refresh` option can be wither `true` or `false`. When `true`, the API will occasionally refresh the parsed data stored under `data_directory` automatically. When `false`, a specific API endpoint must be hit to refresh the data. In either case, the data is refreshed once on first startup.
+The `auto_refresh` option can be wither `true` or `false`. When `true`, the API will occasionally refresh the parsed data stored under `data_directory` automatically. When `false`, a specific API endpoint must be hit to refresh the data. In either case, the data is refreshed once at startup.
 
 #### `refresh_time`
 
-The `refres_time` option specifies a number of seconds between `auto_refresh` events. This number should be high enough to avoid overloading the system (dependent on parsing time) while low enough to not return excessively-outdated data. Between 30 and 300 seconds generally sufficient.
+The `refresh_time` option specifies the number of seconds between `auto_refresh` events. This number should be high enough to avoid overloading the system (dependent on parsing time) while low enough to not return excessively-outdated data. Between 30 and 300 seconds generally sufficient.
 
 #### `listen`
 
@@ -75,7 +75,7 @@ The `auth_string` option provides a password which can be used to control access
 
 #### `subnet_file`
 
-The `subnet_file` option sets a path to the ISC-DHCP configuration file which lists all subnets your DHCP server provides services for. In simple deployments, this is likely to be `/etc/dhcp/dhcpd.conf` or something similar; in more advanced deployments with split configuration files, it must be a *single* file containing all subnets; DHCPStatus cannot parse subnet definitions from multiple files.
+The `subnet_file` option sets a path to the ISC-DHCP configuration file which lists all subnets your DHCP server provides services for. In simple deployments, this is likely to be `/etc/dhcp/dhcpd.conf` or something similar; in more advanced deployments with split configuration files, it must be a *single* file containing all subnets; DHCPStats cannot parse subnet definitions from multiple files.
 
 #### `static_file`
 
