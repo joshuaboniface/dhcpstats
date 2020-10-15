@@ -333,13 +333,6 @@ def parse_data():
     logger('done. ({} leases parsed)'.format(len(leases)), t_start=t_start)
 
     # We now have a full dictionary of subnets and of leases; combine them into a final data structure
-    t_start = logger('Combining and counting subnets... ', end='')
-    for subnet in subnets:
-        subnet_used = subnets[subnet]['ips']['active'] + subnets[subnet]['ips']['free'] + subnets[subnet]['ips']['backup']
-        subnet_unused = subnets[subnet]['ips']['total'] - subnet_used
-        subnets[subnet]['ips']['unused'] = subnet_unused
-    logger('done.', t_start=t_start)
-
     t_start = logger('Combining and counting statics... ', end='')
     for static in statics:
         static_subnet = None
@@ -374,6 +367,13 @@ def parse_data():
             elif binding_state == 'backup':
                 subnets[lease_subnet]['ips']['backup'] += 1
             subnets[lease_subnet]['leases'][lease] = lease_data
+    logger('done.', t_start=t_start)
+
+    t_start = logger('Combining and counting subnets... ', end='')
+    for subnet in subnets:
+        subnet_used = subnets[subnet]['ips']['active'] + subnets[subnet]['ips']['free'] + subnets[subnet]['ips']['backup']
+        subnet_unused = subnets[subnet]['ips']['total'] - subnet_used
+        subnets[subnet]['ips']['unused'] = subnet_unused
     logger('done.', t_start=t_start)
 
     return subnets
@@ -557,11 +557,15 @@ class API_Subnets_Detail(Resource):
         """
         result, data = load_data()
         requested_subnet = '255.255.255.255'
-        for subnet in data.keys():
-            if subnet.split('/')[0] == subnet_ip:
-                requested_subnet = subnet
-                break
-        subnet_data = data.get(requested_subnet, None)
+        try:
+            for subnet in data.keys():
+                if subnet.split('/')[0] == subnet_ip:
+                    requested_subnet = subnet
+                    break
+            subnet_data = data.get(requested_subnet, None)
+        except:
+            subnet_data = None
+
         if subnet_data is not None:
             return subnet_data, 200
         else:
