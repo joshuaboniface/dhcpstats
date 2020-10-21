@@ -146,6 +146,7 @@ def parse_data():
     in_subnet_block = False
     in_pool_block = False
     current_subnet = ''
+    subnet_start_indent = ''
 
     # Iterate through the lines
     for line in subnets_raw:
