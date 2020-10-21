@@ -381,8 +381,8 @@ def parse_data():
     return subnets
 
 def save_data():
+    subnets = parse_data()
     try:
-        subnets = parse_data()
         with open(data_file, 'w') as fh:
             fh.write(json.dumps(subnets))
         return True, ''
@@ -583,7 +583,9 @@ if __name__ == "__main__":
 
     # Run the initial parse of the data
     logger('Running initial data parse and save')
-    save_data()
+    result, err = save_data()
+    if not result:
+        logger(err)
 
     # Set up the recurring refresh job
     if auto_refresh:
