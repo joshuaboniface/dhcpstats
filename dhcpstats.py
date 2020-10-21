@@ -206,7 +206,7 @@ def parse_data():
 
         # Start of a subnet block
         if re.match('^[\s]*subnet', line):
-            subnet_start_indent = re.search('^(\s*)subnet', line)
+            subnet_start_indent = ''.join(re.findall('^(\s*)subnet', line))
             in_subnet_block = True
             subnet = ipaddress.ip_network('{}/{}'.format(line_split[1], line_split[3]))
             current_subnet = subnet
