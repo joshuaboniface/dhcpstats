@@ -255,6 +255,10 @@ def parse_data():
             current_static = name
             # This is a single-line host entry, just do the rest of our parsing here
             if re.match('.*}$', line):
+                # Ensure that we can split if there is a malformed end quote without a space
+                line = re.sub('(.*)}$', r'\1 }', line)
+                line_split = line.split()
+
                 in_host_section = False
                 hardware_ethernet_idx = 0
                 static_address_idx = 0
