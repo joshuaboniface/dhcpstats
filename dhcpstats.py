@@ -155,7 +155,7 @@ def parse_data():
         # Split the line for easier parsing later
         line_split = line.split()
         # End of a subnet block
-        if re.match('^{indent}}'.format(indent=subnet_start_indent), line):
+        if re.match('^{indent}}}'.format(indent=subnet_start_indent), line):
             in_subnet_block = False
             if current_subnet:
                 subnets[current_subnet.with_prefixlen]['statics'] = dict()
