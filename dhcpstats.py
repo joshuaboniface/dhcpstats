@@ -143,6 +143,7 @@ def parse_data():
 
     t_start = logger('Parsing subnets... ', end='')
     subnets = dict()
+    in_shared_network_block = False
     in_subnet_block = False
     in_pool_block = False
     current_subnet = ''
@@ -154,40 +155,85 @@ def parse_data():
         line = re.sub(';$', '', line)
         # Split the line for easier parsing later
         line_split = line.split()
-        # End of a subnet block
-        if re.match('^{indent}}}'.format(indent=subnet_start_indent), line):
-            in_subnet_block = False
-            if current_subnet:
-                subnets[current_subnet.with_prefixlen]['statics'] = dict()
-                subnets[current_subnet.with_prefixlen]['leases'] = dict()
-            continue
-        # Inside a subnet block
-        if in_subnet_block:
-            # End of a pool block
-            if re.match('^\s*}$', line):
-                in_pool_block = False
-            # Inside a pool block
+
+        # Structure:
+        #   shared_network <name> {
+        #     subnet x.x.x.x netmask y.y.y.y {
+        #       <descr>
+        #       pool {
+        #         range a.a.a.a b.b.b.b;
+        #         stuff;
+        #       }
+        #       option ...;
+        #       stuff;
+        #     }
+        #   }
+
+        # Start of a shared_network block
+        if re.match('^[\s]*shared-network', line):
+            shared_network_name = line[1]
+            in_shared_network_block = True
+
+        # Start of a subnet block
+        elif re.match('^[\s]*subnet', line):
+            subnet_open_brace_count = 1
+            subnet_close_brace_count = 0
+            subnet_start_indent = ''.join(re.findall('^(\s*)subnet', line))
+            in_subnet_block = True
+            subnet = ipaddress.ip_network('{}/{}'.format(line_split[1], line_split[3]))
+            current_subnet = subnet
+            subnets[subnet.with_prefixlen] = dict()
+            if in_shared_network_block:
+                subnets[subnet.with_prefixlen]['shared_network'] = shared_network_name
+            else:
+                subnets[subnet.with_prefixlen]['shared_network'] = None
+            subnets[subnet.with_prefixlen]['ranges'] = []
+            subnets[subnet.with_prefixlen]['ips'] = {}
+            subnets[subnet.with_prefixlen]['ips']['total'] = 0
+            subnets[subnet.with_prefixlen]['ips']['active'] = 0
+            subnets[subnet.with_prefixlen]['ips']['free'] = 0
+            subnets[subnet.with_prefixlen]['ips']['backup'] = 0
+            subnets[subnet.with_prefixlen]['ips']['unused'] = 0
+            subnets[subnet.with_prefixlen]['ips']['static'] = 0
+
+        # Start of a pool block
+        elif re.match('^\s*pool', line):
+            in_pool_block = True
+
+        # End of a block
+        elif re.match('^[\s]*}', line):
             if in_pool_block:
-                # A range line
-                if re.match('^\s*range', line):
-                    range_start = ipaddress.ip_address(re.sub(';', '', line_split[1]))
-                    range_end = ipaddress.ip_address(re.sub(';', '', line_split[2]))
-                    range_length = int(range_end) - int(range_start) + 1
+                # We were inside a pool block, end it
+                in_pool_block = False
+            elif in_subnet_block:
+                # We were inside a subnet block, end it
+                in_subnet_block = False
+                if current_subnet:
+                    subnets[current_subnet.with_prefixlen]['statics'] = dict()
+                    subnets[current_subnet.with_prefixlen]['leases'] = dict()
+            elif in_shared_network_block:
+                # We were inside a shared network block, end it
+                in_shared_network_block = False
 
-                    subnets[current_subnet.with_prefixlen]['ranges'].append([str(range_start), str(range_end)])
-                    subnets[current_subnet.with_prefixlen]['ips']['total'] += range_length
-            # Start of a pool block
-            if re.match('^\s*pool', line):
-                in_pool_block = True
+        # Inside a pool block
+        elif in_pool_block:
+            # A range line
+            if re.match('^\s*range', line):
+                range_start = ipaddress.ip_address(re.sub(';', '', line_split[1]))
+                range_end = ipaddress.ip_address(re.sub(';', '', line_split[2]))
+                range_length = int(range_end) - int(range_start) + 1
 
+                subnets[current_subnet.with_prefixlen]['ranges'].append([str(range_start), str(range_end)])
+                subnets[current_subnet.with_prefixlen]['ips']['total'] += range_length
+
+        # Inside a subnet block
+        elif in_subnet_block:
             # Description line (begins with '#$')
             if re.match('^\s*#\$', line):
                 subnets[current_subnet.with_prefixlen]['description'] = ' '.join(line_split[1:])
-
             # Routers
-            if re.match('^\s*option routers', line):
+            elif re.match('^\s*option routers', line):
                 subnets[current_subnet.with_prefixlen]['routers'] = line_split[-1].split(',')
-
             # DNS servers
             elif re.match('^\s*option domain-name-servers', line):
                 subnets[current_subnet.with_prefixlen]['dns_servers'] = [ server for server in line_split[-1].split(',') ]
@@ -197,28 +243,10 @@ def parse_data():
             # Domain name
             elif re.match('^\s*option domain-name', line):
                 subnets[current_subnet.with_prefixlen]['domain_name'] = re.sub('"', '', line_split[-1])
-
             # DDNS Domain name
             elif re.match('^\s*ddns-domainname', line):
                 subnets[current_subnet.with_prefixlen]['ddns_domain_name'] = re.sub('"', '', line_split[-1])
 
-            continue
-
-        # Start of a subnet block
-        if re.match('^[\s]*subnet', line):
-            subnet_start_indent = ''.join(re.findall('^(\s*)subnet', line))
-            in_subnet_block = True
-            subnet = ipaddress.ip_network('{}/{}'.format(line_split[1], line_split[3]))
-            current_subnet = subnet
-            subnets[subnet.with_prefixlen] = dict()
-            subnets[subnet.with_prefixlen]['ranges'] = []
-            subnets[subnet.with_prefixlen]['ips'] = {}
-            subnets[subnet.with_prefixlen]['ips']['total'] = 0
-            subnets[subnet.with_prefixlen]['ips']['active'] = 0
-            subnets[subnet.with_prefixlen]['ips']['free'] = 0
-            subnets[subnet.with_prefixlen]['ips']['backup'] = 0
-            subnets[subnet.with_prefixlen]['ips']['unused'] = 0
-            subnets[subnet.with_prefixlen]['ips']['static'] = 0
     logger('done. ({} subnets parsed)'.format(len(subnets)), t_start=t_start)
 
     # Read in the static entries
@@ -372,7 +400,10 @@ def parse_data():
                 subnets[lease_subnet]['ips']['free'] += 1
             elif binding_state == 'backup':
                 subnets[lease_subnet]['ips']['backup'] += 1
-            subnets[lease_subnet]['leases'][lease] = lease_data
+            try:
+                subnets[lease_subnet]['leases'][lease] = lease_data
+            except Exception as e:
+                subnets[lease_subnet]['leases'][lease] = None
     logger('done.', t_start=t_start)
 
     t_start = logger('Combining and counting subnets... ', end='')
