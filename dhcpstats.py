@@ -171,7 +171,7 @@ def parse_data():
 
         # Start of a shared_network block
         if re.match('^[\s]*shared-network', line):
-            shared_network_name = line[1]
+            shared_network_name = line_split[1]
             in_shared_network_block = True
 
         # Start of a subnet block
