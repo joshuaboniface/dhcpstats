@@ -574,8 +574,10 @@ class API_Subnets_List(Resource):
         result, data = load_data()
         if result:
             for subnet in data:
-                del data[subnet]['leases']
-                del data[subnet]['statics']
+                if data[subnet].get('leases', None) is not None:
+                    del data[subnet]['leases']
+                if data[subnet].get('statics', None) is not None:
+                    del data[subnet]['statics']
             return data, 200
         else:
             return { "result": data }, 500
