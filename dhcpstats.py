@@ -220,7 +220,12 @@ def parse_data():
             # A range line
             if re.match('^\s*range', line):
                 range_start = ipaddress.ip_address(re.sub(';', '', line_split[1]))
-                range_end = ipaddress.ip_address(re.sub(';', '', line_split[2]))
+                try:
+                    range_end = ipaddress.ip_address(re.sub(';', '', line_split[2]))
+                except IndexError:
+                    # Single-IP range with no end
+                    range_end = range_start
+
                 range_length = int(range_end) - int(range_start) + 1
 
                 subnets[current_subnet.with_prefixlen]['ranges'].append([str(range_start), str(range_end)])
