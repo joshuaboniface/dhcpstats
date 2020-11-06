@@ -254,6 +254,8 @@ def parse_data():
 
     logger('done. ({} subnets parsed)'.format(len(subnets)), t_start=t_start)
 
+    del(subnets_raw)
+
     # Read in the static entries
     t_start = logger('Reading static file... ', end='')
     with open(static_file, 'r') as static_fh:
@@ -322,6 +324,8 @@ def parse_data():
                 statics[name] = {}
     logger('done. ({} statics parsed)'.format(len(statics)), t_start=t_start)
 
+    del(statics_raw)
+
     # Read in the leases_file
     t_start = logger('Reading leases file... ', end='')
     with open(leases_file, 'r') as leases_fh:
@@ -370,6 +374,8 @@ def parse_data():
             current_lease = lease
             leases[str(lease)] = dict()
     logger('done. ({} leases parsed)'.format(len(leases)), t_start=t_start)
+
+    del(leases_raw)
 
     # We now have a full dictionary of subnets and of leases; combine them into a final data structure
     t_start = logger('Combining and counting statics... ', end='')
@@ -425,8 +431,10 @@ def save_data():
     try:
         with open(data_file, 'w') as fh:
             fh.write(json.dumps(subnets))
+        del(subnets)
         return True, ''
     except Exception as e:
+        del(subnets)
         return False, str(e)
 
 def load_data():
