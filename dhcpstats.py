@@ -381,7 +381,11 @@ def parse_data():
     t_start = logger('Combining and counting statics... ', end='')
     for static in statics:
         static_subnet = None
-        static_ipobj = ipaddress.ip_address(statics[static]['ip_address'])
+        try:
+            static_ipobj = ipaddress.ip_address(statics[static]['ip_address'])
+        except:
+            continue
+
         for subnet in subnets:
             subnet_ipobj = ipaddress.ip_network(subnet)
             if static_ipobj in subnet_ipobj:
