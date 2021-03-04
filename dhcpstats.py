@@ -436,9 +436,11 @@ def save_data():
     subnets = parse_data()
     try:
         for subnet in subnets:
+            subnet_data = subnets[subnet]
+            subnet_data['subnet'] = subnet
             data_file = '{}/{}.json'.format(data_directory, subnet.split('/')[0])
             with open(data_file, 'w') as fh:
-                fh.write(json.dumps(subnets[subnet]))
+                fh.write(json.dumps(subnet_data))
         del(subnets)
         return True, ''
     except Exception as e:
@@ -456,7 +458,7 @@ def load_data(subnet=None):
             for filename in [f for f in os.listdir(data_directory) if os.path.isfile(os.path.join(data_directory, f))]:
                 with open(os.path.join(data_directory, filename), 'r') as fh:
                     subnet_data = json.loads(fh.read())
-                subnets[list(subnet_data.keys())[0]] = subnet_data[list(subnet_data.keys())[0]]
+                subnets[subnet_data['subnet']] = subnet_data
         return True, subnets
     except Exception as e:
         return False, str(e)
@@ -653,6 +655,7 @@ if __name__ == "__main__":
     # Set up clean termination
     def cleanup(signum='', frame=''):
         refresh_timer.shutdown()
+        exit(0)
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGQUIT, cleanup)
