@@ -96,7 +96,7 @@ if not os.path.isdir(data_directory):
         exit(1)
 
 # Attempt to create/write to a data file
-tmp_data_file = '{}/dhcpstats.test'.format(data_directory)
+tmp_data_file = '{}/dhcpstats.subnets'.format(data_directory)
 try:
     with open(tmp_data_file, 'w') as fh:
         fh.write('')
