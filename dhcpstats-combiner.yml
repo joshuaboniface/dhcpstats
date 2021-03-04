@@ -1,0 +1,21 @@
+---
+# Example configuration file for dhcpstats-combiner
+dhcpstats-combiner:
+  # Enable or disable debug mode
+  debug: true
+  # Enable or disable file loging
+  log_to_file: true
+  # Log file path
+  log_file: ./dhcpstats.log
+  # API listen address; use 0.0.0.0 for all interfaces
+  listen: '0.0.0.0:1980'
+  # Authentication string to prevent unauthorized access
+  auth_string: test123
+  # List of dhcpstats instance hosts to connect to
+  hosts:
+    - hostname: "server1"
+      port: 1980
+      api_password: test123
+    - hostname: "server2"
+      port: 1980
+      api_password: test123

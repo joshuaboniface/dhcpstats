@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# $FreeBSD
+#
+# PROVIDE: dhcpstats-combiner
+# REQUIRE: SERVERS
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf
+# to enable this service:
+#
+# dhcpstats_combiner_enable (bool):   Set to NO by default.
+#                                     Set it to YES to enable dhcpstats-combiner.
+# dhcpstats_combiner_config (path):   Set to the location of the "dhcpstats-combiner.yml" configuration file.
+#                                     Defaults to "/usr/local/etc/dhcpstats-combiner.yml".
+
+. /etc/rc.subr
+
+name=dhcpstats_combiner
+rcvar=dhcpstats_combiner_enable
+load_rc_config $name
+
+# Set defaults
+: ${dhcpstats_combiner_enable:="NO"}
+: ${dhcpstats_combiner_config:="/usr/local/etc/dhcpstats-combiner.yml"}
+
+export DHCPSTATS_CONFIG_FILE="${dhcpstats-combiner_config}"
+
+pidfile=/var/run/dhcpstats-combiner.pid
+command=/usr/local/bin/python3
+standalone=/usr/local/bin/dhcpstats-combiner.py
+
+start_cmd=dhcpstats_combiner_start
+stop_postcmd=dhcpstats_combiner_cleanup
+
+dhcpstats_combiner_start() {
+    echo "Starting dhcpstats-combiner."
+    /usr/bin/touch ${pidfile}
+    /usr/sbin/daemon -cf -p ${pidfile} ${standalone} ${viewvc_flags}
+}
+
+dhcpstats_combiner_cleanup() {
+    [ -f ${pidfile} ] && /bin/rm -f ${pidfile}
+}
+
+run_rc_command "$1"

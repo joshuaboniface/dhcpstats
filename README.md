@@ -238,3 +238,7 @@ The `backup` value is only relevant for failover configurations. It counts the n
 The `unused` value is calculated by adding all the `active`, `free`, and `backup` counts together, then subtracting this from the `total` value. This value represents all the potentially valid leases the server could hand out from the configured `ranges`, but which have not been registered in the `dhcpd.leases` database yet due to not having ever been requested. After a long time of serving clients, it's unlikely that a subnet will have any `unused` IPs, but newer or low-volume subnets might have quite a lot of `unused` IPs.
 
 The `static` value is calculated by examining all `statics` entries. Since static DHCP reservations in ISC-DHCP must be outside of the `ranges` to operate properly, this number has no relation to the remaining values, but is provided for convenience; it could easily be obtained by the client by counting the number of entries in the `statics` dictionary.
+
+## Combiner
+
+The `dhcpstats-combiner` tool acts as a client for `dhcpstats`, and a server for an upstream consumer. It can be used in situations where you might have multiple DHCPStats instances (for example, two or more DHCP servers) and want unified information from them.
