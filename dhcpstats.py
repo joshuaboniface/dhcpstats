@@ -454,7 +454,7 @@ def load_data(subnet=None):
                 subnets = json.loads(fh.read())
         else:
             for filename in [f for f in os.listdir(data_directory) if os.path.isfile(os.path.join(data_directory, f))]:
-                with open(filename, 'r') as fh:
+                with open(os.path.join(data_directory, filename), 'r') as fh:
                     subnet_data = json.loads(fh.read())
                 subnets[list(subnet_data.keys())[0]] = subnet_data[list(subnet_data.keys())[0]]
         return True, subnets
