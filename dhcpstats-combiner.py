@@ -102,7 +102,6 @@ def get_data(api_host, api_port, api_password, mode):
     if response.status_code == 200:
         return json.loads(response.content.decode('utf-8'))
     else:
-        logger(response)
         return None
 
 def combine_data(split_data):
@@ -112,7 +111,6 @@ def combine_data(split_data):
     all_keys = list()
     for instance in split_data:
         if instance is None:
-            logger(split_data)
             continue
         instance_keys = instance.keys()
         for key in instance_keys:
@@ -137,7 +135,6 @@ def combine_data(split_data):
             combined_tmp = list()
             # Create a temporary list containing the dictionaries from all instances if they contain IP info
             for instance_idx in instance_list:
-                logger(split_data[instance_idx][subnet])
                 if split_data[instance_idx][subnet].get('ips', None) is not None:
                     combined_tmp.append(split_data[instance_idx][subnet])
             # If there's only one "real" instance, add it
