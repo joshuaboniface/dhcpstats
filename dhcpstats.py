@@ -88,7 +88,6 @@ except KeyError as e:
     exit(1)
 
 # Confirm the data directory exists or create it, dying if unable to
-data_file = '{}/dhcpstats.subnets'.format(data_directory)
 if not os.path.isdir(data_directory):
     try:
         os.makedirs(data_directory, 0o700)
@@ -96,12 +95,15 @@ if not os.path.isdir(data_directory):
         print('Error: Cannot create data directory {}'.format(data_directory))
         exit(1)
 
-# Attempt to create/write to the file
+# Attempt to create/write to a data file
+tmp_data_file = '{}/dhcpstats.test'.format(data_directory)
 try:
-    with open(data_file, 'a') as fh:
+    with open(tmp_data_file, 'w') as fh:
         fh.write('')
+    if os.path.exists(tmp_data_file):
+        os.remove(tmp_data_file)
 except:
-    print('Error: Cannot write to data file {}'.format(data_file))
+    print('Error: Cannot write to test data file {}'.format(tmp_data_file))
     exit(1)
 
 if not debug:
@@ -433,18 +435,28 @@ def parse_data():
 def save_data():
     subnets = parse_data()
     try:
-        with open(data_file, 'w') as fh:
-            fh.write(json.dumps(subnets))
+        for subnet in subnets:
+            data_file = '{}/{}.json'.format(data_directory, subnet.split('/')[0])
+            with open(data_file, 'w') as fh:
+                fh.write(json.dumps(subnets[subnet]))
         del(subnets)
         return True, ''
     except Exception as e:
         del(subnets)
         return False, str(e)
 
-def load_data():
+def load_data(subnet=None):
     try:
-        with open(data_file, 'r') as fh:
-            subnets = json.loads(fh.read())
+        subnets = dict()
+        if subnet is not None:
+            filename = "{}/{}.json".format(data_directory, subnet)
+            with open(filename, 'r') as fh:
+                subnets = json.loads(fh.read())
+        else:
+            for filename in [f for f in os.listdir(data_directory) if os.path.isfile(os.path.join(data_directory, f))]:
+                with open(filename, 'r') as fh:
+                    subnet_data = json.loads(fh.read())
+                subnets[list(subnet_data.keys())[0]] = subnet_data[list(subnet_data.keys())[0]]
         return True, subnets
     except Exception as e:
         return False, str(e)
@@ -611,19 +623,9 @@ class API_Subnets_Detail(Resource):
               id: subnet
               properties:
         """
-        result, data = load_data()
-        requested_subnet = '255.255.255.255'
-        try:
-            for subnet in data.keys():
-                if subnet.split('/')[0] == subnet_ip:
-                    requested_subnet = subnet
-                    break
-            subnet_data = data.get(requested_subnet, None)
-        except:
-            subnet_data = None
-
-        if subnet_data is not None:
-            return subnet_data, 200
+        result, data = load_data(subnet=subnet_ip)
+        if result is not None:
+            return data, 200
         else:
             return { "result": "subnet {} was not found".format(subnet_ip) }, 404
 api.add_resource(API_Subnets_Detail, '/subnets/<subnet_ip>')
