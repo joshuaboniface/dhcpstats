@@ -333,6 +333,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGQUIT, cleanup)
+    signal.signal(signal.SIGKILL, cleanup)
 
     if debug:
         logger('Starting API in debug mode')
