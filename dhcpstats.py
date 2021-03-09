@@ -213,6 +213,8 @@ def parse_data():
                 if current_subnet:
                     subnets[current_subnet.with_prefixlen]['statics'] = dict()
                     subnets[current_subnet.with_prefixlen]['leases'] = dict()
+                    if len(subnets[current_subnet.with_prefixlen].get('description', '')) < 1:
+                        subnets[current_subnet.with_prefixlen]['description'] = current_subnet.with_prefixlen
             elif in_shared_network_block:
                 # We were inside a shared network block, end it
                 in_shared_network_block = False
@@ -235,8 +237,8 @@ def parse_data():
 
         # Inside a subnet block
         elif in_subnet_block:
-            # Description line (begins with '#$')
-            if re.match('^\s*#\$', line):
+            # Description line (begins with '#$' or '#!')
+            if re.match('^\s*#[$!]', line):
                 subnets[current_subnet.with_prefixlen]['description'] = ' '.join(line_split[1:])
             # Routers
             elif re.match('^\s*option routers', line):
