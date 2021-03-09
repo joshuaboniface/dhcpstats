@@ -655,6 +655,7 @@ if __name__ == "__main__":
     # Set up clean termination
     def cleanup(signum='', frame=''):
         refresh_timer.shutdown()
+        logger('Terminating on signal {}'.format(signum))
         exit(0)
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
