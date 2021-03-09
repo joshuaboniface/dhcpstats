@@ -122,9 +122,11 @@ def combine_data(split_data):
     for subnet in duplicate_subnets:
         # Get a list if indexes and instances and the count of this subnet in all instances
         instance_list = list()
+        instance_name_list = list()
         for idx, instance in enumerate(split_data):
             if subnet in list(instance.keys()):
                 instance_list.append(idx)
+                instance_name_list.append(host_list[idx]['hostname'])
         count = len(instance_list)
         # If there is only a single instance, append the data to the output list
         if count == 1:
@@ -136,6 +138,11 @@ def combine_data(split_data):
             # Create a temporary list containing the dictionaries from all instances if they contain IP info
             for instance_idx in instance_list:
                 if split_data[instance_idx][subnet].get('ips', None) is not None:
+                    # Update the description to include the instance
+                    if split_data[instance_idx][subnet].get('description', None) is not None:
+                        split_data[instance_idx][subnet]['description'] = "{} from {}".format(split_data[instance_idx][subnet]['description'], instance_name_list[instance_idx])
+                    else:
+                        split_data[instance_idx][subnet]['description'] = "from {}".format(instance_name_list[instance_idx])
                     combined_tmp.append(split_data[instance_idx][subnet])
             # If there's only one "real" instance, add it
             if len(combined_tmp) == 1:
@@ -180,6 +187,8 @@ def query_hosts(hosts, mode):
                 if data_tmp['ips'].get('active', 0) > 0:
                     formatted_data = data_tmp
                     break
+            # If all returned no active IPs, use the last (all the same)
+            formatted_data = data_tmp
 
     return True, formatted_data
 
