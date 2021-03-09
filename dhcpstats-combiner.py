@@ -161,7 +161,7 @@ def combine_data(split_data):
                 combined_data[subnet] = split_data[0][subnet]
             # Use the single active instance
             else:
-                combined_data[subnet] = tmp
+                combined_data[subnet] = active_subnets[0]
 
     return combined_data
 
