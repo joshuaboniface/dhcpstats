@@ -336,12 +336,7 @@ if __name__ == "__main__":
 
     if debug:
         logger('Starting API in debug mode')
-        app.run(listen_addr, listen_port, use_reloader=False)
+        app.run(listen_addr, listen_port, use_reloader=True, threaded=True)
     else:
         logger('Starting API in production mode')
-        monkey.patch_all()
-        http_server = gevent.pywsgi.WSGIServer(
-            (listen_addr, listen_port),
-            app
-        )
-        http_server.serve_forever()
+        app.run(listen_addr, listen_port, use_reloader=False, threaded=True)
