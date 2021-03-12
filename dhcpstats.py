@@ -240,6 +240,10 @@ def parse_data():
             # Description line (begins with '#$' or '#!')
             if re.match('^\s*#[$!]', line):
                 subnets[current_subnet.with_prefixlen]['description'] = ' '.join(line_split[1:])
+                if re.match('^\s*#!', line):
+                    subnets[current_subnet.with_prefixlen]['monitor'] = False
+                else:
+                    subnets[current_subnet.with_prefixlen]['monitor'] = True
             # Routers
             elif re.match('^\s*option routers', line):
                 subnets[current_subnet.with_prefixlen]['routers'] = line_split[-1].split(',')
