@@ -190,6 +190,7 @@ def parse_data():
             else:
                 subnets[subnet.with_prefixlen]['shared_network'] = None
             subnets[subnet.with_prefixlen]['ranges'] = []
+            subnets[subnet.with_prefixlen]['monitor'] = True
             subnets[subnet.with_prefixlen]['ips'] = {}
             subnets[subnet.with_prefixlen]['ips']['total'] = 0
             subnets[subnet.with_prefixlen]['ips']['active'] = 0
