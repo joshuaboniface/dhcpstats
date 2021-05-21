@@ -443,17 +443,19 @@ def parse_data():
 
 def save_data():
     subnets = parse_data()
-    filelist = os.listdir(data_directory)
+    file_list = os.listdir(data_directory)
     try:
         for subnet in subnets:
             subnet_data = subnets[subnet]
             subnet_data['subnet'] = subnet
-            data_file = '{}/{}.json'.format(data_directory, subnet.split('/')[0])
-            filelist.remove("{}.json".format(subnet.split('/')[0]))
+            data_filename = '{}.json'.format(subnet.split('/')[0])
+            data_file = '{}/{}'.format(data_directory, data_filename)
+            if data_filename in file_list:
+                file_list.remove(data_filename)
             with open(data_file, 'w') as fh:
                 fh.write(json.dumps(subnet_data))
         del(subnets)
-        for stalefile in filelist:
+        for stalefile in file_list:
             os.remove("{}/{}".format(data_directory, stalefile))
         return True, ''
     except Exception as e:
