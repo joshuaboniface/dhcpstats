@@ -175,6 +175,7 @@ def parse_data():
         if re.match('^[\s]*shared-network', line):
             shared_network_name = line_split[1]
             in_shared_network_block = True
+            logger("Found shared network {}".format(shared_network_name))
 
         # Start of a subnet block
         elif re.match('^[\s]*subnet', line):
@@ -198,6 +199,7 @@ def parse_data():
             subnets[subnet.with_prefixlen]['ips']['backup'] = 0
             subnets[subnet.with_prefixlen]['ips']['unused'] = 0
             subnets[subnet.with_prefixlen]['ips']['static'] = 0
+            logger("Found subnet {}".format(current_subnet))
 
         # Start of a pool block
         elif re.match('^\s*pool', line):
@@ -441,14 +443,18 @@ def parse_data():
 
 def save_data():
     subnets = parse_data()
+    filelist = os.listdir(data_directory)
     try:
         for subnet in subnets:
             subnet_data = subnets[subnet]
             subnet_data['subnet'] = subnet
             data_file = '{}/{}.json'.format(data_directory, subnet.split('/')[0])
+            filelist.remove("{}.json".format(subnet.split('/')[0]))
             with open(data_file, 'w') as fh:
                 fh.write(json.dumps(subnet_data))
         del(subnets)
+        for stalefile in filelist:
+            os.remove("{}/{}".format(data_directory, stalefile))
         return True, ''
     except Exception as e:
         del(subnets)
