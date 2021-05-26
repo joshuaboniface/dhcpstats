@@ -460,6 +460,7 @@ def save_data():
         return True, ''
     except Exception as e:
         del(subnets)
+        logger("Failed to parse or save data: {}".format(e))
         return False, str(e)
 
 def load_data(subnet=None):
