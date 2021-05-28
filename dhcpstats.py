@@ -43,11 +43,11 @@ def logger(msg, end='\n', t_start=None):
     # Starting a timed message
     if not t_start:
         t_start = int(time())
-        msg = '{} {}'.format(datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f'), msg)
     # Completing a timed message
     else:
         t_tot = int(time()) - t_start
         msg = msg + " [{}s]".format(str(t_tot))
+
     # Output the message
     if debug:
         print(msg, end=end, file=sys.stderr)
