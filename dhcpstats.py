@@ -443,6 +443,7 @@ def parse_data():
 
 def save_data():
     subnets = parse_data()
+    t_start = logger('Saving data... ', end='')
     file_list = os.listdir(data_directory)
     try:
         for subnet in subnets:
@@ -457,13 +458,16 @@ def save_data():
         del(subnets)
         for stalefile in file_list:
             os.remove("{}/{}".format(data_directory, stalefile))
+        logger('done.', t_start=t_start)
         return True, ''
     except Exception as e:
+        logger('failed.', t_start=t_start)
+        logger('Error: {}'.format(e))
         del(subnets)
-        logger("Failed to parse or save data: {}".format(e))
         return False, str(e)
 
 def load_data(subnet=None):
+    t_start = logger('Loading data... ', end='')
     try:
         subnets = dict()
         if subnet is not None:
@@ -475,8 +479,11 @@ def load_data(subnet=None):
                 with open(os.path.join(data_directory, filename), 'r') as fh:
                     subnet_data = json.loads(fh.read())
                 subnets[subnet_data['subnet']] = subnet_data
+        logger('done.', t_start=t_start)
         return True, subnets
     except Exception as e:
+        logger('failed.', t_start=t_start)
+        logger('Error: {}'.format(e))
         return False, str(e)
 
 #
