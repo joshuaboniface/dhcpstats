@@ -30,7 +30,7 @@ import flask
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 debug = True
@@ -475,7 +475,7 @@ def load_data(subnet=None):
             with open(filename, 'r') as fh:
                 subnets = json.loads(fh.read())
         else:
-            for filename in [f for f in os.listdir(data_directory) if os.path.isfile(os.path.join(data_directory, f))]:
+            for filename in os.listdir(data_directory):
                 with open(os.path.join(data_directory, filename), 'r') as fh:
                     subnet_data = json.loads(fh.read())
                 subnets[subnet_data['subnet']] = subnet_data
@@ -666,7 +666,8 @@ if __name__ == "__main__":
     if auto_refresh:
         refresh_timer = BackgroundScheduler()
         logger('Starting autorefresh timer ({} second interval)'.format(refresh_time))
-        refresh_timer.add_job(save_data, 'interval', next_run_time=datetime.now(), seconds=refresh_time, misfire_grace_time=int(refresh_time/2))
+        refresh_timer.add_job(save_data, 'date', next_run_time=datetime.now() + timedelta(0,1))
+        refresh_timer.add_job(save_data, 'interval', seconds=refresh_time, misfire_grace_time=int(refresh_time/2))
         refresh_timer.start()
 
     # Set up clean termination
@@ -680,7 +681,7 @@ if __name__ == "__main__":
 
     if debug:
         logger('Starting API in debug mode')
-        app.run_forever(listen_addr, listen_port, use_reloader=True, threaded=True)
+        app.run(listen_addr, listen_port, use_reloader=True, threaded=False, processes=10)
     else:
         logger('Starting API in production mode')
-        app.run_forever(listen_addr, listen_port, use_reloader=False, threaded=True)
+        app.run(listen_addr, listen_port, use_reloader=False, threaded=False, processes=10)
