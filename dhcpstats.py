@@ -662,6 +662,13 @@ api.add_resource(API_Subnets_Detail, '/subnets/<subnet_ip>')
 if __name__ == "__main__":
     logger('Starting up')
 
+    if debug:
+        logger('Starting API in debug mode')
+        app.run(listen_addr, listen_port, use_reloader=True, threaded=True)
+    else:
+        logger('Starting API in production mode')
+        app.run(listen_addr, listen_port, use_reloader=False, threaded=True)
+
     # Run the initial parse of the data
     logger('Running initial data parse and save')
     result, err = save_data()
@@ -683,10 +690,3 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGQUIT, cleanup)
-
-    if debug:
-        logger('Starting API in debug mode')
-        app.run(listen_addr, listen_port, use_reloader=True, threaded=True)
-    else:
-        logger('Starting API in production mode')
-        app.run(listen_addr, listen_port, use_reloader=False, threaded=True)
