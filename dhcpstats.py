@@ -78,6 +78,7 @@ try:
     auto_refresh = o_config['dhcpstats'].get('auto_refresh', False)
     refresh_time = int(o_config['dhcpstats']['refresh_time'])
     auth_string = o_config['dhcpstats'].get('auth_string', None)
+    api_processes = o_config['dhcpstats'].get('api_processes', 10)
     listen_addr = o_config['dhcpstats']['listen'].split(':')[0]
     listen_port = int(o_config['dhcpstats']['listen'].split(':')[-1])
     subnet_file = o_config['dhcpstats']['subnet_file']
@@ -681,7 +682,7 @@ if __name__ == "__main__":
 
     if debug:
         logger('Starting API in debug mode')
-        app.run(listen_addr, listen_port, use_reloader=True, threaded=False, processes=10)
+        app.run(listen_addr, listen_port, use_reloader=True, threaded=False, processes=api_processes)
     else:
         logger('Starting API in production mode')
-        app.run(listen_addr, listen_port, use_reloader=False, threaded=False, processes=10)
+        app.run(listen_addr, listen_port, use_reloader=False, threaded=False, processes=api_processes)
