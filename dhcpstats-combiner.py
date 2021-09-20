@@ -30,6 +30,8 @@ from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
 from datetime import datetime
+from queue import Queue
+from threading import Thread
 
 debug = True
 
@@ -73,6 +75,7 @@ try:
     log_to_file = o_config['dhcpstats-combiner'].get('log_to_file', False)
     log_file = o_config['dhcpstats-combiner'].get('log_file', None)
     auth_string = o_config['dhcpstats-combiner'].get('auth_string', None)
+    auth_strings = o_config['dhcpstats-combiner'].get('auth_strings', None)
     listen_addr = o_config['dhcpstats-combiner']['listen'].split(':')[0]
     listen_port = int(o_config['dhcpstats-combiner']['listen'].split(':')[-1])
     host_list = o_config['dhcpstats-combiner']['hosts']
@@ -94,18 +97,38 @@ app.register_blueprint(blueprint)
 #
 # Helper functions
 #
-def get_data(api_host, api_port, api_password, mode):
-    logger("Querying host {}:{} mode {}".format(api_host, api_port, mode))
+def get_data(queue, api_host, api_port, api_password, mode, host_idx, hosts_count):
+    logger("Querying host {}:{} mode {} [{}/{}]".format(api_host, api_port, mode, host_idx, hosts_count))
     api_headers = { 'X-Api-Key': api_password }
     api_url = "http://{}:{}/subnets/{}".format(api_host, api_port, mode)
-    response = requests.get(api_url, headers=api_headers)
+    try:
+        response = requests.get(api_url, headers=api_headers)
+    except requests.exceptions.ConnectionError:
+        data = None
+
     if response.status_code == 200:
-        return json.loads(response.content.decode('utf-8'))
+        data = json.loads(response.content.decode('utf-8'))
     else:
-        return None
+        data = None
+
+    if data is None:
+        logger("Got no valid data from host {}:{} [{}/{}]".format(api_host, api_port, host_idx, hosts_count))
+    else:
+        logger("Got data from host {}:{} [{}/{}]".format(api_host, api_port, host_idx, hosts_count))
+
+    queue.put(data)
+
+    return
 
 def combine_data(split_data):
     combined_data = dict()
+    duplicate_subnets = list()
+
+    # Phase 0: Prepare an instance list by index
+    instance_name_list = list()
+    for idx, instance in enumerate(split_data):
+        instance_name_list.append(host_list[idx]['hostname'])
+    instance_count = len(instance_name_list)
 
     # Phase 1: Determine any duplicated subnets between the instances
     all_keys = list()
@@ -113,81 +136,142 @@ def combine_data(split_data):
         if instance is None:
             continue
         instance_keys = instance.keys()
+        if instance_keys is None:
+            continue
         for key in instance_keys:
             all_keys.append(key)
     dupe = set()
     for key in all_keys:
-        if key in dupe:
+        if key in dupe and key not in duplicate_subnets:
             duplicate_subnets.append(key)
         else:
             dupe.add(key)
     for instance in split_data:
-        for key in instance.keys():
-            if key not in duplicate_subnets:
-                combined_data[key] = instance[key]
+        try:
+            for key in instance.keys():
+                if key not in duplicate_subnets:
+                    combined_data[key] = instance[key]
+        except AttributeError as e:
+            logger("Failed to parse {}: {}".format(instance, e))
 
     # Phase 2: Check each subnet in each instance for the # of used IPs
     for subnet in duplicate_subnets:
-        # Get a list if indexes and instances and the count of this subnet in all instances
-        instance_list = list()
-        for idx, instance in enumerate(split_data):
-            if subnet in list(instance.keys()):
-                instance_list.append(idx)
-        count = len(instance_list)
-        # If there is only a single instance, append the data to the output list
-        if count == 1:
-            combined_data[subnet] = split_data[instance_list[0]][subnet]
-        # If there is more than one instance, do more parsing
-        if count > 1:
-            logger('Found dupe subnet {} in instances {}'.format(subnet, instance_list))
-            combined_tmp = list()
-            # Create a temporary list containing the dictionaries from all instances if they contain IP info
-            for instance_idx in instance_list:
-                if split_data[instance_idx][subnet].get('ips', None) is not None:
-                    combined_tmp.append(split_data[instance_idx][subnet])
-            # If there's only one "real" instance, add it
-            if len(combined_tmp) == 1:
-                combined_data[subnet] = combined_tmp[0]
+        logger("Parsing dupe'd subnet {}".format(subnet))
+        temp_data = dict()
+
+        # Get a dictionary with all the various iterations of this subnet in it
+        for instance_idx, instance_name in enumerate(instance_name_list):
+            try:
+                temp_data[instance_name] = split_data[instance_idx][subnet]
+            except KeyError:
+                # This subnet isn't in this instance, so continue
                 continue
-            # For each instance, record the number of 'active' IPs for the subnet
-            active_counts = list()
-            for tmp in combined_tmp:
-                active_counts.append(tmp['ips'].get('active', 0))
-            # For each count, check if it's greater than 0, and append the data to the active subnets list
-            active_subnets = list()
-            for idx, count in enumerate(active_counts):
-                if count > 0:
-                    active_subnets.append(combined_tmp[idx])
-            # If there is more than one active subnet, this is a true dupe between dhcpstats instances,
-            # not some failover cluster configuration. We will append both but renaming the keys based
-            # on the instance hostname so the final dict is valid
-            if len(active_subnets) > 1:
-                for instance_idx in instance_list:
-                    combined_data['{} [{}]'.format(subnet, host_list[instance_idx]['hostname'])] = split_data[instance_idx][subnet]
-            # If there is less than one active subnet, just use the first (the data is zero anyways)
-            elif len(active_subnets) < 1:
-                combined_data[subnet] = split_data[0][subnet]
-            # Use the single active instance
+
+        # Parse through the list and remove any obviously-useless subnet instances
+        first_zeroactive = None
+        first_zerototal = None
+        for instance_name in temp_data.copy():
+            # Remove entries which don't interest us
+            if not temp_data[instance_name].get('monitor', False):
+                # We should not monitor this subnet on this instance
+                del temp_data[instance_name]
+            elif not temp_data[instance_name].get('ips', False):
+                # The subnet 'ips' entry is empty
+                del temp_data[instance_name]
+            elif temp_data[instance_name]['ips'].get('total', 0) < 1:
+                # There are zero configured IPs in this subnet on this instance
+                # We should save a copy though, just in case we end up with no entries for the subnet
+                if first_zerototal is None:
+                    first_zerototal = temp_data[instance_name]
+                del temp_data[instance_name]
+            elif temp_data[instance_name]['ips'].get('active', 0) < 1:
+                # There are zero active IPs in this subnet on this instance
+                # We should save a copy though, just in case we end up with no entries for the subnet
+                if first_zeroactive is None:
+                    first_zeroactive = temp_data[instance_name]
+                del temp_data[instance_name]
+
+        # Check the result of the previous work to see how many subnet definitions we have left
+        if temp_data is None or len(temp_data) < 1:
+            # There are none left, so there were dupes but none of them had any valid IPs. Use the first_zeroactive data
+            if first_zeroactive is not None:
+                combined_data[subnet] = first_zeroactive
+            elif first_zerototal is not None:
+                combined_data[subnet] = first_zerototal
             else:
-                combined_data[subnet] = active_subnets[0]
+                combined_data[subnet] = dict()
+        elif len(temp_data) > 1:
+            # Somehow there are still multiple instances. We must look through those that remain and show only the one with the most active
+            max_active_count = 0
+            max_active_idx = 0
+            for idx, instance_name in enumerate(temp_data.copy()):
+                active_count = temp_data[instance_name]['ips']['active']
+                if active_count > max_active_count:
+                    max_active_count = active_count
+                    max_active_ifx = idx
+            key = list(temp_data.keys())[max_active_idx]
+            combined_data[subnet] = temp_data[key]
+        else:
+            key = list(temp_data.keys())[0]
+            # We have exactly one subnet left, so that must be the good one
+            combined_data[subnet] = temp_data[key]
 
     return combined_data
 
 def query_hosts(hosts, mode):
-    data = []
-    formatted_data = {}
+    data = list()
+    formatted_data = dict()
+    host_queues = dict()
+    host_threads = dict()
 
     if mode in ['all', 'list']:
-        for host in hosts:
-            data.append(get_data(host['hostname'], host['port'], host['api_password'], mode))
+        hosts_count = len(hosts)
+        logger("Acquiring data from {} hosts".format(hosts_count))
+        for host_idx, host in enumerate(hosts, start=1):
+            hostname = host['hostname']
+            host_queues[hostname] = Queue()
+            host_threads[hostname] = Thread(target=get_data, args=(host_queues[hostname], host['hostname'], host['port'], host['api_password'], mode, host_idx, hosts_count), kwargs={})
+            host_threads[hostname].start()
+        for host_idx, host in enumerate(hosts, start=1):
+            hostname = host['hostname']
+            logger("Joining gathering thread for host {} [{}/{}]".format(hostname, host_idx, hosts_count))
+            host_threads[hostname].join(timeout=15.0)
+        for host_idx, host in enumerate(hosts, start=1):
+            try:
+                hostname = host['hostname']
+                logger("Appending queue data for host {} [{}/{}]".format(hostname, host_idx, hosts_count))
+                queue_data = host_queues[hostname].get(block=False)
+                data.append(queue_data)
+            except Exception as e:
+                logger("ERROR: {}".format(e))
+
+        logger("Parsing data from {} hosts".format(hosts_count))
         formatted_data = combine_data(data)
+
     else:
+        hosts_count = len(hosts)
+        logger("Acquiring data from {} hosts".format(hosts_count))
+        for host_idx, host in enumerate(hosts, start=1):
+            hostname = host['hostname']
+            host_queues[hostname] = Queue()
+            host_threads[hostname] = Thread(target=get_data, args=(host_queues[hostname], host['hostname'], host['port'], host['api_password'], mode, host_idx, hosts_count), kwargs={})
+            host_threads[hostname].start()
+        for host_idx, host in enumerate(hosts, start=1):
+            hostname = host['hostname']
+            logger("Joining gathering thread for host {} [{}/{}]".format(hostname, host_idx, hosts_count))
+            host_threads[hostname].join(timeout=15.0)
+        logger("Parsing data from {} hosts".format(hosts_count))
         for host in hosts:
-            data_tmp = get_data(host['hostname'], host['port'], host['api_password'], mode)
+            hostname = host['hostname']
+            data_tmp = host_queues[hostname].get()
+            if type(data_tmp) is not dict:
+                continue
             if data_tmp.get('ips', None) is not None:
                 if data_tmp['ips'].get('active', 0) > 0:
                     formatted_data = data_tmp
                     break
+            # If all returned no active IPs, use the last (all the same)
+            formatted_data = data_tmp
 
     return True, formatted_data
 
@@ -200,8 +284,13 @@ def Authenticator(function):
         if auth_string is None:
             return function(*args, **kwargs)
         if 'X-Api-Key' in flask.request.headers:
-            if flask.request.headers.get('X-Api-Key') == auth_string:
-                return function(*args, **kwargs)
+            if auth_string is not None:
+                if flask.request.headers.get('X-Api-Key') == auth_string:
+                    return function(*args, **kwargs)
+            if auth_strings is not None:
+                for string in auth_strings:
+                    if flask.request.headers.get('X-Api-Key') == string:
+                        return function(*args, **kwargs)
         return { "message": "X-Api-Key authentication failed." }, 401
     return authenticate
 
