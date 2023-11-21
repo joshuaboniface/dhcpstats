@@ -27,11 +27,14 @@ import re
 import json
 import ipaddress
 import flask
+import gzip
 from functools import wraps
 from flask_restful import Resource, Api, reqparse, abort
 from time import time
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
+from shutil import copyfileobj
+from io import BytesIO
 
 debug = True
 
@@ -458,6 +461,8 @@ def save_data():
                 fh.write(json.dumps(subnet_data))
         del(subnets)
         for stalefile in file_list:
+            if not stalefile.endswith(".json"):
+                continue
             os.remove("{}/{}".format(data_directory, stalefile))
         logger('done.', t_start=t_start)
         return True, ''
@@ -477,6 +482,8 @@ def load_data(subnet=None):
                 subnets = json.loads(fh.read())
         else:
             for filename in os.listdir(data_directory):
+                if not filename.endswith(".json"):
+                    continue
                 with open(os.path.join(data_directory, filename), 'r') as fh:
                     subnet_data = json.loads(fh.read())
                 subnets[subnet_data['subnet']] = subnet_data
@@ -486,6 +493,25 @@ def load_data(subnet=None):
         logger('failed.', t_start=t_start)
         logger('Error: {}'.format(e))
         return False, str(e)
+
+def get_leases_db():
+    t_start = logger('Gzipping subnet file to data directory... ', end='')
+    with open(leases_file, 'rb') as subnets_fh:
+        with gzip.open(os.path.join(data_directory, "dhcpd.leases.gz"), 'wb') as zip_fh:
+            try:
+                copyfileobj(subnets_fh, zip_fh)
+            except Exception as e:
+                logger('failed.', t_start=t_start)
+                return {"message": "Failed to compress leases database: {e}".format(e=e)}, 500
+    logger('done.', t_start=t_start)
+
+    with open(os.path.join(data_directory, "dhcpd.leases.gz"), 'rb') as zip_fh:
+        return flask.send_file(
+            BytesIO(zip_fh.read()),
+            attachment_filename="dhcpd.leases.gz",
+            mimetype="application/gzip",
+            as_attachment=True,
+        )
 
 #
 # API helper definitons
@@ -526,6 +552,23 @@ class API_Root(Resource):
         """
         return { "message": "dhcpstats API" }, 200
 api.add_resource(API_Root, '/')
+
+class API_Leases(Resource):
+    @Authenticator
+    def get(self):
+        """
+        Return the raw leases database in gzipped binary format
+        ---
+        tags:
+          - leases
+        responses:
+          200:
+            description: OK
+            schema:
+              type: binary
+        """
+        return get_leases_db()
+api.add_resource(API_Leases, "/leases")
 
 class API_Subnets(Resource):
     @Authenticator
