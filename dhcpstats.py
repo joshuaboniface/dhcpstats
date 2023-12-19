@@ -199,6 +199,7 @@ def parse_data():
             subnets[subnet.with_prefixlen]['ips'] = {}
             subnets[subnet.with_prefixlen]['ips']['total'] = 0
             subnets[subnet.with_prefixlen]['ips']['active'] = 0
+            subnets[subnet.with_prefixlen]['ips']['released'] = 0
             subnets[subnet.with_prefixlen]['ips']['free'] = 0
             subnets[subnet.with_prefixlen]['ips']['backup'] = 0
             subnets[subnet.with_prefixlen]['ips']['unused'] = 0
@@ -426,6 +427,8 @@ def parse_data():
             binding_state = lease_data['binding-state']
             if binding_state == 'active':
                 subnets[lease_subnet]['ips']['active'] += 1
+            elif binding_state == 'released':
+                subnets[lease_subnet]['ips']['released'] += 1
             elif binding_state == 'free':
                 subnets[lease_subnet]['ips']['free'] += 1
             elif binding_state == 'backup':
