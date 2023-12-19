@@ -497,6 +497,47 @@ def load_data(subnet=None):
         logger('Error: {}'.format(e))
         return False, str(e)
 
+def load_counts():
+    t_start = logger('Loading data... ', end='')
+    try:
+        ips = dict()
+        for filename in os.listdir(data_directory):
+            if not filename.endswith(".json"):
+                continue
+            with open(os.path.join(data_directory, filename), 'r') as fh:
+                subnet_data = json.loads(fh.read())
+            ips[subnet_data['subnet']] = subnet_data['ips']
+        ip_counts = {
+            'total': 0,
+            'static': 0,
+            'active': 0,
+            'released': 0,
+            'free': 0,
+            'backup': 0,
+            'unused': 0,
+        }
+        for subnet in ips:
+            ip_counts['total'] += ips[subnet]['total']
+            ip_counts['static'] += ips[subnet]['static']
+            ip_counts['active'] += ips[subnet]['active']
+            ip_counts['released'] += ips[subnet]['released']
+            ip_counts['free'] += ips[subnet]['free']
+            ip_counts['backup'] += ips[subnet]['backup']
+            ip_counts['unused'] += ips[subnet]['unused']
+        estimated_devices = ip_counts['static'] + ip_counts['active']
+
+        data = {
+            'ip_counts': ip_counts,
+            'estimated_devices': estimated_devices,
+        }
+
+        logger('done.', t_start=t_start)
+        return True, data
+    except Exception as e:
+        logger('failed.', t_start=t_start)
+        logger('Error: {}'.format(e))
+        return False, str(e)
+
 def get_leases_db():
     t_start = logger('Gzipping subnet file to data directory... ', end='')
     with open(leases_file, 'rb') as subnets_fh:
@@ -555,6 +596,29 @@ class API_Root(Resource):
         """
         return { "message": "dhcpstats API" }, 200
 api.add_resource(API_Root, '/')
+
+class API_Counts(Resource):
+    @Authenticator
+    def get(self):
+        """
+        Return counts of all leases for monitoring purposes
+        ---
+        tags:
+          - totals
+        responses:
+          200:
+            description: OK
+            schema:
+              type: object
+              id: count
+              properties:
+        """
+        result, data = load_counts()
+        if result is not None:
+            return data, 200
+        else:
+            return { "result": "no data found" }, 404
+api.add_resource(API_Counts, "/counts")
 
 class API_Leases(Resource):
     @Authenticator
